@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - FastAPI Auth</title>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+    <div class="max-w-md w-full bg-white rounded-lg shadow-lg p-8" 
+         x-data="authForm()">
+        
+        <h2 class="text-2xl font-bold text-center text-gray-800 mb-8">
+            Iniciar Sesión
+        </h2>
+
+        <!-- Alerta de error -->
+        <div x-show="error && !user" 
+             x-text="error"
+             class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4"
+             style="display: none;">
+        </div>
+
+        <!-- Alerta de éxito -->
+        <div x-show="success && !user" 
+             x-text="success"
+             class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4"
+             style="display: none;">
+        </div>
+
+        <!-- Formulario Login -->
+        <form @submit.prevent="login" x-show="!showRegister && !user">
+            <div class="mb-4">
+                <label class="block text-gray-700 text-sm font-bold mb-2">
+                    Usuario
+                </label>
+                <input type="text" x-model="username" required
+                       class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500">
+            </div>
+            <div class="mb-6">
+                <label class="block text-gray-700 text-sm font-bold mb-2">
+                    Contraseña
+                </label>
+                <input type="password" x-model="password" required
+                       class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500">
+            </div>
+            <button type="submit" :disabled="loading"
+                    class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded disabled:opacity-50">
+                <span x-show="!loading">Ingresar</span>
+                <span x-show="loading">Cargando...</span>
+            </button>
+        </form>
+
+        <!-- Formulario Registro -->
+        <form @submit.prevent="register" x-show="showRegister && !user">
+            <div class="mb-4">
+                <label class="block text-gray-700 text-sm font-bold mb-2">
+                    Usuario
+                </label>
+                <input type="text" x-model="regUsername" required
+                       class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500">
+            </div>
+            <div class="mb-4">
+                <label class="block text-gray-700 text-sm font-bold mb-2">
+                    Email
+                </label>
+                <input type="email" x-model="regEmail" required
+                       class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500">
+            </div>
+            <div class="mb-6">
+                <label class="block text-gray-700 text-sm font-bold mb-2">
+                    Contraseña
+                </label>
+                <input type="password" x-model="regPassword" required
+                       class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:border-blue-500">
+            </div>
+            <button type="submit" :disabled="loading"
+                    class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded disabled:opacity-50">
+                <span x-show="!loading">Registrarse</span>
+                <span x-show="loading">Cargando...</span>
+            </button>
+        </form>
+
+        <!-- Toggle Login/Registro -->
+        <div class="mt-6 text-center" x-show="!user">
+            <p class="text-gray-600">
+                <span x-text="showRegister ? '¿Ya tienes cuenta?' : '¿No tienes cuenta?'"></span>
+                <button @click="toggleForm" class="text-blue-500 hover:underline ml-1">
+                    <span x-text="showRegister ? 'Iniciar sesión' : 'Registrarse'"></span>
+                </button>
+            </p>
+        </div>
+
+        <!-- Info Usuario Logueado -->
+        <div x-show="user" class="text-center">
+            <h3 class="text-xl font-bold text-gray-800 mb-2">
+                ¡Bienvenido, <span x-text="user?.username"></span>!
+            </h3>
+            <p class="text-gray-600 mb-4" x-text="user?.email"></p>
+            
+            <!-- Botones de prueba para endpoints protegidos -->
+            <div class="mt-4 space-y-2">
+                <button @click="testProtected"
+                        class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded text-sm">
+                    Test Protected Endpoint
+                </button>
+                <button @click="testPublic"
+                        class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded text-sm">
+                    Test Public Endpoint
+                </button>
+            </div>
+            
+            <div x-show="apiResult" 
+                 class="mt-4 p-3 bg-gray-50 rounded text-left">
+                <pre class="text-xs text-gray-700" x-text="apiResult"></pre>
+            </div>
+            
+            <button @click="logout"
+                    class="mt-4 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded">
+                Cerrar Sesión
+            </button>
+        </div>
+    </div>
+
+    <script>
+        function authForm() {
+            return {
+                username: '',
+                password: '',
+                regUsername: '',
+                regEmail: '',
+                regPassword: '',
+                loading: false,
+                error: '',
+                success: '',
+                showRegister: false,
+                user: null,
+
+                init() {
+                    const token = localStorage.getItem('access_token');
+                    if (token) {
+                        this.getCurrentUser();
+                    }
+                },
+
+                async login() {
+                    this.loading = true;
+                    this.error = '';
+                    
+                    const formData = new URLSearchParams();
+                    formData.append('username', this.username);
+                    formData.append('password', this.password);
+
+                    try {
+                        const res = await fetch('/auth/login', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                            body: formData
+                        });
+
+                        const data = await res.json();
+
+                        if (!res.ok) {
+                            throw new Error(data.detail || 'Error al iniciar sesión');
+                        }
+
+                        localStorage.setItem('access_token', data.access_token);
+                        this.success = '¡Inicio de sesión exitoso!';
+                        this.username = '';
+                        this.password = '';
+                        await this.getCurrentUser();
+                    } catch (err) {
+                        this.error = err.message;
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                async register() {
+                    this.loading = true;
+                    this.error = '';
+
+                    try {
+                        const res = await fetch('/auth/register', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                username: this.regUsername,
+                                email: this.regEmail,
+                                password: this.regPassword
+                            })
+                        });
+
+                        const data = await res.json();
+
+                        if (!res.ok) {
+                            throw new Error(data.detail || 'Error al registrar');
+                        }
+
+                        this.success = '¡Registro exitoso! Ahora inicia sesión.';
+                        this.regUsername = '';
+                        this.regEmail = '';
+                        this.regPassword = '';
+                        this.showRegister = false;
+                    } catch (err) {
+                        this.error = err.message;
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                async getCurrentUser() {
+                    const token = localStorage.getItem('access_token');
+                    if (!token) return;
+
+                    try {
+                        const res = await fetch('/users/me', {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+
+                        if (!res.ok) {
+                            localStorage.removeItem('access_token');
+                            return;
+                        }
+
+                        this.user = await res.json();
+                    } catch (err) {
+                        console.error(err);
+                    }
+                },
+
+                logout() {
+                    localStorage.removeItem('access_token');
+                    this.user = null;
+                    this.success = 'Sesión cerrada';
+                },
+
+                toggleForm() {
+                    this.showRegister = !this.showRegister;
+                    this.error = '';
+                    this.success = '';
+                },
+
+                async testProtected() {
+                    const token = localStorage.getItem('access_token');
+                    try {
+                        const res = await fetch('/api/protected', {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const data = await res.json();
+                        this.apiResult = JSON.stringify(data, null, 2);
+                    } catch (err) {
+                        this.apiResult = 'Error: ' + err.message;
+                    }
+                },
+
+                async testPublic() {
+                    try {
+                        const res = await fetch('/api/public');
+                        const data = await res.json();
+                        this.apiResult = JSON.stringify(data, null, 2);
+                    } catch (err) {
+                        this.apiResult = 'Error: ' + err.message;
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>

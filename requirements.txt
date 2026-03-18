@@ -1,0 +1,25 @@
+# FastAPI y servidor
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+
+# Base de datos
+sqlmodel>=0.0.14
+
+# Seguridad y autenticación
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+
+# Validación y settings
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+email-validator>=2.0.0
+
+# Utilidades
+python-multipart>=0.0.6
+
+# Validación de archivos
+python-magic>=0.4.27
+
+# Desarrollo (opcional)
+# pytest>=7.4.0
+# httpx>=0.25.0

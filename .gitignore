@@ -1,0 +1,82 @@
+# Base de datos SQLite y temporales
+*.db
+*.sqlite
+*.sqlite3
+instance/
+.webassets-cache
+
+# Directorio de datos y uploads
+data/*
+!data/.gitkeep
+!data/uploads/
+data/uploads/*
+!data/uploads/.gitkeep
+
+# Entorno virtual y dependencias Python
+venv/
+.venv/
+env/
+ENV/
+bin/
+include/
+lib/
+share/
+pyvenv.cfg
+
+# Python (Cache y compilados)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE y Editores
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Frontend (Node / Svelte)
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.svelte-kit/
+frontend/.vercel/
+.npm
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Variables de entorno (Sensible)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
+# Logs
+*.log
+logs/
+
+# Docker (Ya que el usuario pidió no usarlos de momento)
+Dockerfile
+docker-compose.yml
