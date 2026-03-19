@@ -574,7 +574,7 @@
           <div class="modal-body">
             <div class="ticket" id="ticket-content">
               <div class="ticket-header">
-                <h2>POS Taller de Reparaciones</h2>
+                <h2>CareldPOS</h2>
                 <p>Fecha: {new Date(ticketData.date).toLocaleString()}</p>
               </div>
 

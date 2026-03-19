@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     """Configuración de la aplicación"""
 
     # App
-    APP_NAME: str = "POS Taller Reparaciones"
+    APP_NAME: str = "CareldPOS"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = True
 

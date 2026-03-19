@@ -1,4 +1,4 @@
-# POS Taller de Reparaciones
+# CareldPOS
 
 Sistema de punto de venta y gestión para taller de reparación de dispositivos inteligentes.
 
