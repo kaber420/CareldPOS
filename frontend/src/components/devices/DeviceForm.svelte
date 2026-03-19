@@ -5,6 +5,16 @@
   // Props
   export let customers = [];
   export let selectedCustomerId = '';
+  export let selectedCustomer = null;
+  export let showCustomerForm = false;
+  export let customerForm = {
+    name: '',
+    email: '',
+    phone: '',
+    whatsapp: '',
+    telegram: '',
+    address: ''
+  };
   export let deviceForm = {
     brand: '',
     model: '',
@@ -47,23 +57,57 @@
   const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
   const MAX_VIDEO_SIZE = 30 * 1024 * 1024;
 
+  // Sincronizar selectedCustomer cuando selectedCustomerId cambia
+  $: {
+    if (selectedCustomerId && !showCustomerForm) {
+      selectedCustomer = customers.find(c => c.id === selectedCustomerId) || null;
+    }
+  }
+
   async function handleSubmit() {
     try {
+      let finalCustomerId = selectedCustomerId;
+
+      // Paso 0: Crear cliente si es nuevo
+      if (showCustomerForm) {
+        if (!customerForm.name || !customerForm.phone) {
+          notify('Nombre y teléfono son obligatorios para el nuevo cliente', 'warning');
+          return;
+        }
+        const newCustomer = await api.createCustomer(customerForm);
+        finalCustomerId = newCustomer.id;
+        selectedCustomerId = finalCustomerId;
+        selectedCustomer = newCustomer;
+        customers = [...customers, newCustomer];
+        showCustomerForm = false; // Ocultar formulario después de crear
+      } else {
+        if (!finalCustomerId) {
+          notify('Debe seleccionar o crear un cliente', 'warning');
+          return;
+        }
+      }
+
       // Paso 1: Crear/Actualizar dispositivo sin fotos
       const data = {
         ...deviceForm,
-        customer_id: selectedCustomerId,
+        customer_id: finalCustomerId,
         photos: ''  // Se actualizará después de subir las fotos
       };
 
       let deviceId = editingDeviceId;
+      let result = {
+        device: null,
+        repair: null,
+        customer: selectedCustomer
+      };
       
       if (isEditing && deviceId) {
-        await api.updateDevice(deviceId, data);
+        result.device = await api.updateDevice(deviceId, data);
         notify('Dispositivo actualizado correctamente', 'success');
       } else {
         const device = await api.createDevice(data);
         deviceId = device.id;
+        result.device = device;
         notify('Dispositivo registrado correctamente', 'success');
         
         // Si hay descripción, crear reparación (solo para POS)
@@ -75,7 +119,7 @@
               priority: deviceForm.priority || 'normal',
               estimated_cost: 0
             };
-            await api.createRepair(repairData);
+            result.repair = await api.createRepair(repairData);
           } catch (repairError) {
             console.error('Error creando reparación:', repairError);
             // No fallar si la reparación falla, el dispositivo ya se creó
@@ -119,12 +163,12 @@
         
         if (uploadedUrls.length > 0) {
           // Actualizar dispositivo con las URLs de las fotos
-          await api.updateDevice(deviceId, { photos: uploadedUrls.join(',') });
+          result.device = await api.updateDevice(deviceId, { photos: uploadedUrls.join(',') });
           notify(`${uploadedUrls.length} foto(s) guardada(s)`, 'success');
         }
       }
       
-      onSubmit();
+      onSubmit(result);
     } catch (error) {
       notify(error.message, 'danger');
     }
@@ -325,22 +369,57 @@
 
     <!-- Selección de cliente -->
     <div class="form-section">
-      <h4 class="section-title">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-          <circle cx="12" cy="7" r="4"/>
-        </svg>
-        Cliente
-      </h4>
-      <div class="form-group">
-        <label class="label" for="customer_id">Cliente *</label>
-        <select id="customer_id" class="select" bind:value={selectedCustomerId} required>
-          <option value="">Seleccionar cliente</option>
-          {#each customers as customer}
-            <option value={customer.id}>{customer.name}</option>
-          {/each}
-        </select>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h4 class="section-title" style="margin-bottom: 0;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+          Cliente
+        </h4>
+        <button type="button" class="btn btn-outline btn-sm" on:click={() => showCustomerForm = !showCustomerForm}>
+          {showCustomerForm ? '🔍 Buscar Existente' : '+ Nuevo Cliente'}
+        </button>
       </div>
+
+      {#if showCustomerForm}
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="label">Nombre *</label>
+            <input type="text" class="input" bind:value={customerForm.name} required={showCustomerForm} placeholder="Nombre completo" />
+          </div>
+          <div class="form-group">
+            <label class="label">Teléfono *</label>
+            <input type="tel" class="input" bind:value={customerForm.phone} required={showCustomerForm} placeholder="Ej: 555-0123" />
+          </div>
+          <div class="form-group">
+            <label class="label">Email</label>
+            <input type="email" class="input" bind:value={customerForm.email} placeholder="correo@ejemplo.com" />
+          </div>
+          <div class="form-group">
+            <label class="label">WhatsApp</label>
+            <input type="tel" class="input" bind:value={customerForm.whatsapp} placeholder="Ej: +52 55..." />
+          </div>
+          <div class="form-group full-width">
+            <label class="label">Telegram</label>
+            <input type="text" class="input" bind:value={customerForm.telegram} placeholder="@usuario" />
+          </div>
+          <div class="form-group full-width">
+            <label class="label">Dirección</label>
+            <input type="text" class="input" bind:value={customerForm.address} placeholder="Dirección completa" />
+          </div>
+        </div>
+      {:else}
+        <div class="form-group">
+          <label class="label" for="customer_id">Buscar Cliente *</label>
+          <select id="customer_id" class="select" bind:value={selectedCustomerId} required={!showCustomerForm}>
+            <option value="">Seleccionar cliente</option>
+            {#each customers as customer}
+              <option value={customer.id}>{customer.name} - {customer.phone}</option>
+            {/each}
+          </select>
+        </div>
+      {/if}
     </div>
 
     <!-- Datos del dispositivo -->

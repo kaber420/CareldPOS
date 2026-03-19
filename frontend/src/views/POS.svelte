@@ -485,7 +485,7 @@
       bind:photos
       {isProcessing}
       onClose={() => showReceptionModal = false}
-      onSuccess={loadDevicesForDelivery}
+      onSuccess={async () => { await loadCustomers(); await loadDevicesForDelivery(); }}
       onPrintTicket={printTicket}
     />
 

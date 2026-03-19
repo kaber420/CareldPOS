@@ -8,7 +8,7 @@
   export let customers = [];
   export let selectedCustomer = null;
   export let showCustomerForm = false;
-  export let customerForm = { name: '', email: '', phone: '', address: '' };
+  export let customerForm = { name: '', email: '', phone: '', whatsapp: '', telegram: '', address: '' };
   export let deviceForm = {
     device_type: '',
     brand: '',
@@ -31,34 +31,23 @@
 
   async function handleFormSubmit(result) {
     try {
-      // Obtener el último dispositivo creado (el que acabamos de crear)
-      const devices = await api.getDevices({ limit: 1 });
-      createdDevice = devices[0];
+      const createdDevice = result.device;
+      const repair = result.repair;
 
-      // Crear reparación con la descripción
-      if (deviceForm.description && deviceForm.description.trim()) {
-        const repair = await api.createRepair({
-          device_id: createdDevice.id,
-          technician_id: null,
-          description: deviceForm.description,
-          status: 'pending',
-          priority: deviceForm.priority,
-          estimated_cost: 0
-        });
-
+      if (repair) {
         // Generar QR
         const qrData = JSON.stringify({
           repair_id: repair.id,
           repair_number: repair.repair_number,
           device: createdDevice.brand + ' ' + createdDevice.model,
-          customer: selectedCustomer.name
+          customer: result.customer.name
         });
         const qrCodeDataUrl = await QRCode.toDataURL(qrData, { width: 300 });
 
         // Imprimir ticket
         onPrintTicket({
           type: 'recepcion',
-          customer: selectedCustomer,
+          customer: result.customer,
           device: createdDevice,
           repair: repair,
           qrCode: qrCodeDataUrl,
@@ -79,7 +68,7 @@
     deviceForm = { device_type: '', brand: '', model: '', serial_number: '', color: '', storage: '', password_pattern: '', accessories: '', description: '', priority: 'normal' };
     photos = [];
     selectedCustomer = null;
-    customerForm = { name: '', email: '', phone: '', address: '' };
+    customerForm = { name: '', email: '', phone: '', whatsapp: '', telegram: '', address: '' };
     showCustomerForm = false;
     onClose();
   }
