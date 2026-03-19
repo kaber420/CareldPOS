@@ -7,7 +7,7 @@ sqlmodel>=0.0.14
 
 # Seguridad y autenticación
 python-jose[cryptography]>=3.3.0
-passlib[bcrypt]>=1.7.4
+bcrypt>=4.0.0
 
 # Validación y settings
 pydantic>=2.0.0
@@ -18,7 +18,7 @@ email-validator>=2.0.0
 python-multipart>=0.0.6
 
 # Validación de archivos
-python-magic>=0.4.27
+filetype>=1.2.0
 
 # Desarrollo (opcional)
 # pytest>=7.4.0

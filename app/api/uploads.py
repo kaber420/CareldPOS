@@ -1,6 +1,6 @@
 import os
 import uuid
-import magic
+import filetype
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from app.database import SessionLocal
@@ -71,10 +71,16 @@ async def upload_photo(device_id: int, file: UploadFile = File(...)):
     if not es_valido:
         raise HTTPException(status_code=400, detail=error_msg)
     
-    # Validar MIME type REAL usando python-magic
+    # Validar MIME type REAL usando la librería filetype
     # Esto previene ataques donde un archivo .jpg contiene código malicioso
-    mime = magic.Magic(mime=True)
-    actual_mime = mime.from_buffer(content[:1024])  # Leer primeros bytes
+    kind = filetype.guess(content[:1024])
+    if kind is None:
+        raise HTTPException(
+            status_code=400,
+            detail="No se pudo determinar el tipo de archivo."
+        )
+    
+    actual_mime = kind.mime
     
     if actual_mime not in ALLOWED_MIME_TYPES:
         raise HTTPException(

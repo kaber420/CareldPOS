@@ -1,24 +1,32 @@
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import jwt, JWTError
-from passlib.context import CryptContext
+import bcrypt
 from app.config import settings
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-
 class SecurityManager:
-    """Manejo de seguridad: JWT y hashing de contraseñas"""
+    """Manejo de seguridad: JWT y hashing de contraseñas directo con bcrypt"""
 
     @staticmethod
     def hash_password(password: str) -> str:
-        """Hashear contraseña"""
-        return pwd_context.hash(password)
+        """Hashear contraseña usando bcrypt directo"""
+        # Bcrypt requiere bytes, así que encodeamos la contraseña
+        pwd_bytes = password.encode('utf-8')
+        # Generamos el salt y hasheamos
+        salt = bcrypt.gensalt()
+        hashed = bcrypt.hashpw(pwd_bytes, salt)
+        # Retornamos el hash como string
+        return hashed.decode('utf-8')
 
     @staticmethod
     def verify_password(plain_password: str, hashed_password: str) -> bool:
-        """Verificar contraseña"""
-        return pwd_context.verify(plain_password, hashed_password)
+        """Verificar contraseña usando bcrypt directo"""
+        try:
+            pwd_bytes = plain_password.encode('utf-8')
+            hashed_bytes = hashed_password.encode('utf-8')
+            return bcrypt.checkpw(pwd_bytes, hashed_bytes)
+        except Exception:
+            return False
 
     @staticmethod
     def create_access_token(
