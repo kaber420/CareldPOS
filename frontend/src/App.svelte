@@ -15,6 +15,8 @@
   import POS from './views/POS.svelte';
   import NotFound from './views/NotFound.svelte';
   import ClientPortal from './views/ClientPortal.svelte';
+  import Settings from './views/Settings.svelte';
+  import { fetchPublicSettings } from './stores/settings';
 
   let isLoading = true;
 
@@ -29,6 +31,7 @@
         clearAuth();
       }
     }
+    await fetchPublicSettings();
     isLoading = false;
   });
 
@@ -54,6 +57,7 @@
     <Route path="/inventory" component={Inventory} />
     <Route path="/pos" component={POS} />
     <Route path="/portal/:token" component={ClientPortal} />
+    <Route path="/settings" component={Settings} />
     <Route path="*" component={NotFound} />
   </Router>
 {/if}

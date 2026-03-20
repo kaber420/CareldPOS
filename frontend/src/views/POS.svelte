@@ -16,6 +16,7 @@
   import PhotoGallery from '../components/pos/PhotoGallery.svelte';
   import POSCart from '../components/pos/POSCart.svelte';
   import TicketModal from '../components/common/TicketModal.svelte';
+  import StatusModal from '../components/common/StatusModal.svelte';
 
   const ALLOWED_MIME_TYPES = new Set([
     'image/jpeg',
@@ -88,6 +89,8 @@
   let ticketData = null;
   let showPhotosModal = false;
   let showScanQR = false;
+  let showStatusModal = false;
+  let deviceForStatusChange = null;
 
   // Cámara
   let cameraMode = 'photo';
@@ -193,29 +196,29 @@
   }
 
   async function onStatusChange(device) {
-    const newStatus = prompt(
-      `Cambiar estado de ${device.brand} ${device.model}:\n\n` +
-      `Estados disponibles:\n` +
-      `- registered\n` +
-      `- in_repair\n` +
-      `- waiting_parts\n` +
-      `- ready\n` +
-      `- delivered\n\n` +
-      `Nuevo estado:`
-    );
-    
-    if (newStatus && ['registered', 'in_repair', 'waiting_parts', 'ready', 'delivered'].includes(newStatus)) {
+    deviceForStatusChange = device;
+    showStatusModal = true;
+  }
+
+  async function handleStatusSelect(newStatus) {
+    if (newStatus && deviceForStatusChange) {
       try {
-        await api.updateDevice(device.id, { status: newStatus });
+        await api.updateDevice(deviceForStatusChange.id, { status: newStatus });
         notify('Estado actualizado correctamente', 'success');
         await loadDevicesForDelivery();
       } catch (error) {
         notify('Error al actualizar estado', 'danger');
       }
-    } else if (newStatus) {
-      notify('Estado no válido', 'warning');
     }
   }
+
+  const deviceStatusLabels = {
+    registered: 'Registrado',
+    in_repair: 'En Reparación',
+    waiting_parts: 'Esperando Repuestos',
+    ready: 'Listo para Entrega',
+    delivered: 'Entregado'
+  };
 
   // Funciones de cámara
   async function openCamera(mode = 'photo') {
@@ -368,19 +371,18 @@
   }
 
   let printClass = '';
-  function printTicket(data) {
+  let autoPrint = false;
+  function printTicket(data, shouldAutoPrint = false) {
     if (typeof data === 'string') {
       // Si recibimos un string, es un comando de impresión específica
       printClass = data;
       setTimeout(() => {
         window.print();
-        // No reseteamos printClass aquí porque window.print es bloqueante en muchos navegadores,
-        // pero queremos que se limpie DESPUÉS de imprimir.
-        // Un truco común es usar un evento 'afterprint'
       }, 100);
       return;
     }
     ticketData = data;
+    autoPrint = shouldAutoPrint;
     showTicket = true;
     printClass = '';
   }
@@ -722,6 +724,7 @@
     <TicketModal
       show={showTicket}
       {ticketData}
+      {autoPrint}
       onClose={closeTicket}
     />
 
@@ -731,6 +734,14 @@
       photos={galleryPhotos}
       currentIndex={galleryCurrentIndex}
       onClose={() => showPhotoGallery = false}
+    />
+
+    <StatusModal
+      show={showStatusModal}
+      currentStatus={deviceForStatusChange?.status}
+      options={deviceStatusLabels}
+      onSelect={handleStatusSelect}
+      onClose={() => showStatusModal = false}
     />
   </div>
 </Layout>

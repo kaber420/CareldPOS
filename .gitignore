@@ -80,3 +80,4 @@ logs/
 # Docker (Ya que el usuario pidió no usarlos de momento)
 Dockerfile
 docker-compose.yml
+.drafts/

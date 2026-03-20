@@ -5,6 +5,7 @@ from app.models.repair import Repair, RepairStatus, RepairItem
 from app.models.inventory import InventoryItem, Category
 from app.models.payment import Payment, PaymentMethod
 from app.models.sale import Sale, SaleItem
+from app.models.setting import Setting
 
 __all__ = [
     "User",
@@ -21,4 +22,5 @@ __all__ = [
     "PaymentMethod",
     "Sale",
     "SaleItem",
+    "Setting",
 ]

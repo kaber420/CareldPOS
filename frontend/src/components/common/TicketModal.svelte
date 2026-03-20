@@ -1,13 +1,16 @@
 <script>
   import { onMount } from 'svelte';
   import QRCode from 'qrcode';
+  import { publicSettings } from '../../stores/settings';
 
   export let show = false;
   export let ticketData = null;
   export let onClose = () => {};
+  export let autoPrint = false;
 
   let printClass = '';
   let qrCodeUrl = '';
+  let paperWidth = '80mm'; // Default
 
   $: if (show && ticketData) {
     if (ticketData.repair && ticketData.repair.portal_token) {
@@ -15,14 +18,24 @@
     } else if (ticketData.qrCode) {
       qrCodeUrl = ticketData.qrCode;
     }
+    
+    if (autoPrint) {
+      setTimeout(() => {
+        window.print();
+      }, 500);
+    }
   }
 
   async function generateQR() {
     try {
-      const portalUrl = `${window.location.origin}/portal/${ticketData.repair.portal_token}`;
+      // Usar variable de entorno o fallback a origin
+      const baseUrl = $publicSettings.portal_url || window.location.origin;
+      const portalUrl = `${baseUrl}/portal/${ticketData.repair.portal_token}`;
+      
       qrCodeUrl = await QRCode.toDataURL(portalUrl, { 
         width: 300,
         margin: 2,
+        errorCorrectionLevel: 'M',
         color: {
           dark: '#000000',
           light: '#ffffff'
@@ -51,18 +64,24 @@
     <div class="modal-header">
       <div>
         <h3 class="modal-title">Impresión de Ticket</h3>
-        <p class="modal-subtitle">Vista previa de impresión</p>
+        <div style="display: flex; gap: 1rem; align-items: center; margin-top: 0.25rem;">
+           <p class="modal-subtitle" style="margin: 0;">Vista previa</p>
+           <select class="select select-sm" bind:value={paperWidth} style="padding: 2px 8px; font-size: 0.75rem;">
+             <option value="80mm">Papel 80mm</option>
+             <option value="58mm">Papel 58mm</option>
+           </select>
+        </div>
       </div>
       <button class="modal-close" on:click={onClose}>×</button>
     </div>
     
-    <div class="modal-body {printClass}" style="background: var(--light); padding: 2rem; max-height: 70vh; overflow-y: auto;">
+    <div class="modal-body {printClass} {paperWidth === '58mm' ? 'w-58mm' : 'w-80mm'}" style="background: var(--light); padding: 2rem; max-height: 70vh; overflow-y: auto;">
       <div id="ticket-content" class="ticket">
         {#if ticketData.type === 'recepcion' || ticketData.type === 'etiqueta_full'}
           <!-- TICKET DE RECEPCION -->
           <div class="ticket-page" id="printable-receipt">
             <div class="ticket-header">
-              <h2>CareldPOS</h2>
+              <h2>{$publicSettings.store_name || 'CareldPOS'}</h2>
               <p class="text-sm">Orden de Servicio: {ticketData.repair?.repair_number || 'N/A'}</p>
               <p>Fecha: {new Date(ticketData.date || Date.now()).toLocaleString()}</p>
             </div>
@@ -90,12 +109,12 @@
               <div class="ticket-qr">
                 <img src={qrCodeUrl} alt="QR de seguimiento" />
                 <p class="text-xs mt-2">Escanee para consultar estado</p>
-                <p class="text-xs font-bold mt-1">WWW.CARELD.COM</p>
+                <p class="text-xs font-bold mt-1">{$publicSettings.portal_url || window.location.host.toUpperCase()}</p>
               </div>
             {/if}
 
             <div class="ticket-footer">
-              <p class="text-xs">Conserve este ticket para recoger su equipo.</p>
+              <p class="text-xs">{$publicSettings.ticket_footer || 'Conserve este ticket para recoger su equipo.'}</p>
               <p class="text-xs">No nos hacemos responsables por equipos olvidados después de 30 días.</p>
               <p class="mt-2 font-bold">¡Gracias por su preferencia!</p>
             </div>
@@ -120,7 +139,7 @@
         {#if ticketData.type === 'venta'}
           <div class="ticket-page" id="printable-sale">
             <div class="ticket-header">
-              <h2>CareldPOS</h2>
+              <h2>{$publicSettings.store_name || 'CareldPOS'}</h2>
               <p class="text-sm">Comprobante de Pago</p>
               <p>No. Venta: {ticketData.sale_number || 'TEMP'}</p>
               <p>Fecha: {new Date(ticketData.date || Date.now()).toLocaleString()}</p>
@@ -214,25 +233,28 @@
   .ticket-page {
     padding: 1rem;
     background: white;
-    width: 80mm;
+    width: var(--ticket-width, 80mm);
     margin: 0 auto;
     border: 1px dashed #ccc;
     margin-bottom: 2rem;
   }
 
   .ticket-label {
-    width: 80mm;
+    width: var(--ticket-width, 80mm);
     padding: 5mm;
     border: 1px dashed #ccc;
     page-break-before: always;
   }
+
+  .w-58mm { --ticket-width: 58mm; }
+  .w-80mm { --ticket-width: 80mm; }
 
   .label-border {
     border: 2px solid #000;
     padding: 2mm;
     border-radius: 2mm;
   }
-
+  
   .label-header {
     display: flex;
     justify-content: space-between;
@@ -347,50 +369,67 @@
       size: auto;
     }
     
-    body * {
-      visibility: hidden !important;
+    /* Aislamiento total del ERP */
+    :global(body > *:not(.modal-overlay)) {
+      display: none !important;
     }
     
-    #ticket-content,
-    #ticket-content * {
-      visibility: visible !important;
-    }
-
-    #ticket-content {
-      position: fixed;
-      left: 0;
-      top: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 9999;
-      background: white;
-      margin: 0;
-      padding: 0;
+    :global(.modal-overlay) {
+      background: white !important;
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100% !important;
+      height: auto !important;
       display: block !important;
+      padding: 0 !important;
+      margin: 0 !important;
     }
-
-    .ticket-page, .ticket-label {
-      border: none !important;
-      margin-bottom: 0 !important;
-    }
-
-    .modal-header, .modal-footer, .modal-close {
+    
+    :global(.modal-overlay > *:not(.modal)) {
       display: none !important;
     }
 
     .modal {
       border: none !important;
       box-shadow: none !important;
-      background: transparent !important;
-    }
-    
-    .modal-overlay {
+      width: 100% !important;
+      max-width: none !important;
+      margin: 0 !important;
+      padding: 0 !important;
       background: white !important;
     }
+    
+    .modal-header, .modal-footer, .modal-close {
+      display: none !important;
+    }
 
+    #ticket-content {
+      display: block !important;
+      width: 100% !important;
+    }
+
+    .ticket-page, .ticket-label {
+      border: none !important;
+      margin-bottom: 0 !important;
+      width: var(--ticket-width, 80mm) !important;
+      padding: 5mm !important;
+    }
+
+    /* Reglas de visibilidad específica */
     .print-receipt-only #printable-label { display: none !important; }
+    .print-receipt-only #printable-sale { display: none !important; }
+    
     .print-label-only #printable-receipt { display: none !important; }
-    .print-sale-only #printable-sale { display: block !important; }
+    .print-label-only #printable-sale { display: none !important; }
+    
+    .print-sale-only #printable-receipt { display: none !important; }
+    .print-sale-only #printable-label { display: none !important; }
+
+    /* Forzar visibilidad si el printClass está vacío (Imprimir Todo) */
+    .modal-body:not(.print-receipt-only):not(.print-label-only):not(.print-sale-only) .ticket-page {
+       display: block !important;
+    }
   }
 
   .modal-subtitle {

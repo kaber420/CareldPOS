@@ -5,6 +5,7 @@
   import Layout from '../components/Layout.svelte';
   import Scanner from '../lib/Scanner.svelte';
   import TicketModal from '../components/common/TicketModal.svelte';
+  import StatusModal from '../components/common/StatusModal.svelte';
 
   let repairs = [];
   let devices = [];
@@ -16,6 +17,8 @@
   let showScanner = false;
   let showTicket = false;
   let ticketData = null;
+  let showStatusModal = false;
+  let repairForStatusChange = null;
   
   // Modal de refacciones
   let showPartsModal = false;
@@ -55,6 +58,7 @@
     diagnosis: '',
     estimated_cost: '',
     priority: 'normal',
+    status: 'pending',
     warranty_days: 30,
     technician_id: ''
   };
@@ -121,6 +125,7 @@
         diagnosis: repair.diagnosis || '',
         estimated_cost: repair.estimated_cost || '',
         priority: repair.priority,
+        status: repair.status,
         warranty_days: repair.warranty_days,
         technician_id: repair.technician_id || ''
       };
@@ -156,6 +161,7 @@
          diagnosis: formData.diagnosis || null,
          estimated_cost: formData.estimated_cost ? parseFloat(formData.estimated_cost) : null,
          priority: formData.priority,
+         status: formData.status,
          warranty_days: formData.warranty_days,
          device_id: formData.device_id ? parseInt(formData.device_id) : null,
          technician_id: formData.technician_id ? parseInt(formData.technician_id) : null
@@ -198,6 +204,11 @@
      }
      notify(`Código escaneado: ${code}. No se pudo interpretar como orden o dispositivo.`, 'warning');
    }
+
+  async function openStatusModal(repair) {
+    repairForStatusChange = repair;
+    showStatusModal = true;
+  }
 
   async function updateStatus(repair, newStatus) {
     try {
@@ -391,12 +402,16 @@
         <div class="stat-label">Pendientes</div>
       </div>
       <div class="stat-card stat-progress">
-        <div class="stat-value">{repairs.filter(r => r.status === 'in_progress').length}</div>
-        <div class="stat-label">En Progreso</div>
+        <div class="stat-value">{repairs.filter(r => r.status === 'in_progress' || r.status === 'diagnosing').length}</div>
+        <div class="stat-label">En Taller</div>
+      </div>
+      <div class="stat-card stat-waiting">
+        <div class="stat-value">{repairs.filter(r => r.status === 'waiting_parts').length}</div>
+        <div class="stat-label">Esperando Partes</div>
       </div>
       <div class="stat-card stat-completed">
         <div class="stat-value">{repairs.filter(r => r.status === 'completed').length}</div>
-        <div class="stat-label">Completadas</div>
+        <div class="stat-label">Listos / Completados</div>
       </div>
       <div class="stat-card stat-total">
         <div class="stat-value">{repairs.length}</div>
@@ -478,15 +493,19 @@
                       {/if}
                     </td>
                     <td>
-                      <span class="badge badge-{
-                        repair.status === 'pending' ? 'warning' :
-                        repair.status === 'in_progress' ? 'primary' :
-                        repair.status === 'completed' || repair.status === 'delivered' ? 'success' :
-                        repair.status === 'cancelled' ? 'danger' :
-                        'secondary'
-                      }">
+                      <button 
+                        class="badge badge-{
+                          repair.status === 'pending' ? 'warning' :
+                          repair.status === 'in_progress' ? 'primary' :
+                          repair.status === 'completed' || repair.status === 'delivered' ? 'success' :
+                          repair.status === 'cancelled' ? 'danger' :
+                          'secondary'
+                        }"
+                        style="cursor: pointer; border: none; padding: 4px 8px;"
+                        on:click={() => openStatusModal(repair)}
+                      >
                         {statusLabels[repair.status]}
-                      </span>
+                      </button>
                     </td>
                     <td>
                       <span class="badge badge-{
@@ -510,15 +529,7 @@
                         >
                           👁️
                         </button>
-                        {#if repair.status !== 'delivered' && repair.status !== 'cancelled' && repair.status !== 'completed'}
-                          <button
-                            class="btn btn-sm btn-success"
-                            on:click={() => openCompleteModal(repair)}
-                            title="Cobrar"
-                          >
-                            💰
-                          </button>
-                        {/if}
+                        <!-- Botón de cobrar eliminado por petición del usuario (los técnicos no deben cobrar) -->
                         <button
                           class="btn btn-sm btn-outline"
                           on:click={() => printRepairTicket(repair)}
@@ -597,6 +608,21 @@
                       {/if}
                     {/each}
                   </select>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="label" for="form_status">Estado de Reparación</label>
+                  <select id="form_status" class="select" bind:value={formData.status}>
+                    {#each Object.entries(statusLabels) as [value, label]}
+                      <option {value}>{label}</option>
+                    {/each}
+                  </select>
+                </div>
+                
+                <div class="form-group">
+                  <!-- Espacio para mantener el layout de dos columnas si es necesario -->
                 </div>
               </div>
 
@@ -797,7 +823,16 @@
     <TicketModal
       show={showTicket}
       {ticketData}
+      autoPrint={false}
       onClose={closeTicket}
+    />
+
+    <StatusModal
+      show={showStatusModal}
+      currentStatus={repairForStatusChange?.status}
+      options={statusLabels}
+      onSelect={(status) => updateStatus(repairForStatusChange, status)}
+      onClose={() => showStatusModal = false}
     />
   </div>
 </Layout>
@@ -845,6 +880,7 @@
 
   .stat-pending { border-left-color: var(--warning); }
   .stat-progress { border-left-color: var(--primary); }
+  .stat-waiting { border-left-color: #eb5e28; }
   .stat-completed { border-left-color: var(--success); }
   .stat-total { border-left-color: var(--secondary); }
 

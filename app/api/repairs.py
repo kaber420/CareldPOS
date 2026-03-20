@@ -166,12 +166,25 @@ def update_repair(
         new_status = update_data["status"]
         if new_status == RepairStatus.IN_PROGRESS and not repair.started_at:
             repair.started_at = datetime.utcnow()
-        elif new_status == RepairStatus.COMPLETED and not repair.completed_at:
-            repair.completed_at = datetime.utcnow()
-            # Actualizar estado del dispositivo
-            device = session.get(Device, repair.device_id)
-            if device:
+        
+        # Sincronización con el dispositivo
+        device = session.get(Device, repair.device_id)
+        if device:
+            if new_status == RepairStatus.IN_PROGRESS:
+                device.status = DeviceStatus.IN_REPAIR
+            elif new_status == RepairStatus.WAITING_PARTS:
+                device.status = DeviceStatus.WAITING_PARTS
+            elif new_status == RepairStatus.DIAGNOSING:
+                device.status = DeviceStatus.IN_REPAIR
+            elif new_status == RepairStatus.COMPLETED:
+                repair.completed_at = datetime.utcnow()
                 device.status = DeviceStatus.READY
+            elif new_status == RepairStatus.DELIVERED:
+                repair.delivered_at = datetime.utcnow()
+                device.status = DeviceStatus.DELIVERED
+            elif new_status == RepairStatus.PENDING:
+                device.status = DeviceStatus.REGISTERED
+            session.add(device)
 
     for field, value in update_data.items():
         if value is not None:

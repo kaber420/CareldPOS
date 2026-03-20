@@ -5,6 +5,7 @@ from fastapi.responses import FileResponse
 from app.config import settings
 from app.database import create_db_and_tables
 import os
+import app.models # Asegurar registro de modelos
 from app.api import (
     auth_router,
     users_router,
@@ -15,7 +16,10 @@ from app.api import (
     payments_router,
     uploads_router,
     sales_router,
+    settings_router,
 )
+from app.api.settings import seed_settings
+from app.database import SessionLocal
 
 # Crear aplicación FastAPI
 app = FastAPI(
@@ -30,6 +34,11 @@ app = FastAPI(
 def on_startup():
     """Crear tablas de BD al iniciar"""
     create_db_and_tables()
+    
+    # Sembrar configuraciones por defecto
+    with SessionLocal() as session:
+        print("🌱 Iniciando siembra de configuraciones...") # Added print statement
+        seed_settings(session)
     
     # Crear directorio de uploads si no existe
     os.makedirs("data/uploads", exist_ok=True)
@@ -56,6 +65,7 @@ app.include_router(inventory_router, prefix="/api/v1/inventory", tags=["Inventar
 app.include_router(payments_router, prefix="/api/v1/payments", tags=["Pagos"])
 app.include_router(sales_router, prefix="/api/v1/sales", tags=["Ventas"])
 app.include_router(uploads_router, prefix="/api/v1/uploads", tags=["Archivos"])
+app.include_router(settings_router, prefix="/api/v1/settings", tags=["Configuración"])
 
 
 @app.get("/health", tags=["Health"])

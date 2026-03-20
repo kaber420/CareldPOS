@@ -348,5 +348,30 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data)
     });
+  },
+
+  // Generic methods
+  async get(endpoint) {
+    return request(endpoint);
+  },
+
+  async post(endpoint, data) {
+    return request(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async put(endpoint, data) {
+    return request(endpoint, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async delete(endpoint) {
+    return request(endpoint, {
+      method: 'DELETE'
+    });
   }
 };

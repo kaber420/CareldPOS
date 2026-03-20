@@ -33,4 +33,4 @@ def get_session():
 
 
 # Factory de sesiones
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, class_=Session)

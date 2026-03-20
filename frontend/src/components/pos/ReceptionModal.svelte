@@ -53,7 +53,7 @@
           qrCode: qrCodeDataUrl,
           photos: photos,
           date: new Date().toISOString()
-        });
+        }, true);
       }
 
       notify('Dispositivo recibido correctamente', 'success');
