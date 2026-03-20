@@ -5,6 +5,7 @@ from sqlmodel import SQLModel, Field, Relationship
 
 if TYPE_CHECKING:
     from app.models.repair import Repair
+    from app.models.sale import Sale
 
 
 class PaymentMethod(str, Enum):
@@ -35,7 +36,8 @@ class PaymentBase(SQLModel):
 
 class PaymentCreate(PaymentBase):
     """Schema para crear pago"""
-    repair_id: int
+    repair_id: Optional[int] = None
+    sale_id: Optional[int] = None
 
 
 class PaymentUpdate(SQLModel):
@@ -52,10 +54,12 @@ class Payment(PaymentBase, table=True):
     __tablename__ = "payments"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    repair_id: int = Field(foreign_key="repairs.id", index=True)
+    repair_id: Optional[int] = Field(default=None, foreign_key="repairs.id", index=True)
+    sale_id: Optional[int] = Field(default=None, foreign_key="sales.id", index=True)
     status: PaymentStatus = Field(default=PaymentStatus.PENDING)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     processed_at: Optional[datetime] = None
 
     # Relaciones
     repair: Optional["Repair"] = Relationship(back_populates="payments")  # type: ignore
+    sale: Optional["Sale"] = Relationship(back_populates="payments")  # type: ignore

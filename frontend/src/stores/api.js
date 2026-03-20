@@ -331,5 +331,22 @@ export const api = {
 
   async getPaymentSummary(repairId) {
     return request(`/payments/repair/${repairId}/summary`);
+  },
+
+  // Ventas (Sales)
+  async getSales(params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    return request(`/sales/${queryString ? '?' + queryString : ''}`);
+  },
+
+  async getSale(id) {
+    return request(`/sales/${id}`);
+  },
+
+  async createSale(data) {
+    return request('/sales/', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
   }
 };

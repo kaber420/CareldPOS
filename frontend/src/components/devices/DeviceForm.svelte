@@ -70,11 +70,23 @@
 
       // Paso 0: Crear cliente si es nuevo
       if (showCustomerForm) {
-        if (!customerForm.name || !customerForm.phone) {
-          notify('Nombre y teléfono son obligatorios para el nuevo cliente', 'warning');
+        const missingCustomerFields = [];
+        if (!customerForm.name) missingCustomerFields.push('Nombre');
+        if (!customerForm.phone) missingCustomerFields.push('Teléfono');
+        
+        if (missingCustomerFields.length > 0) {
+          notify(`Faltan campos obligatorios del cliente: ${missingCustomerFields.join(', ')}`, 'warning');
           return;
         }
-        const newCustomer = await api.createCustomer(customerForm);
+
+        // Limpiar campos opcionales para evitar errores de validación (email vacío, etc)
+        const customerData = { ...customerForm };
+        if (!customerData.email) delete customerData.email;
+        if (!customerData.whatsapp) delete customerData.whatsapp;
+        if (!customerData.telegram) delete customerData.telegram;
+        if (!customerData.address) delete customerData.address;
+
+        const newCustomer = await api.createCustomer(customerData);
         finalCustomerId = newCustomer.id;
         selectedCustomerId = finalCustomerId;
         selectedCustomer = newCustomer;
@@ -87,7 +99,17 @@
         }
       }
 
-      // Paso 1: Crear/Actualizar dispositivo sin fotos
+      // Paso 1: Validar y Crear/Actualizar dispositivo
+      const missingDeviceFields = [];
+      if (!deviceForm.device_type) missingDeviceFields.push('Tipo de Dispositivo');
+      if (!deviceForm.brand) missingDeviceFields.push('Marca');
+      if (showDescription && !deviceForm.description?.trim()) missingDeviceFields.push('Descripción del Problema');
+
+      if (missingDeviceFields.length > 0) {
+        notify(`Faltan campos obligatorios del dispositivo: ${missingDeviceFields.join(', ')}`, 'warning');
+        return;
+      }
+
       const data = {
         ...deviceForm,
         customer_id: finalCustomerId,

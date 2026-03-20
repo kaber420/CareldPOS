@@ -14,6 +14,7 @@ from app.api import (
     inventory_router,
     payments_router,
     uploads_router,
+    sales_router,
 )
 
 # Crear aplicación FastAPI
@@ -53,6 +54,7 @@ app.include_router(devices_router, prefix="/api/v1/devices", tags=["Dispositivos
 app.include_router(repairs_router, prefix="/api/v1/repairs", tags=["Reparaciones"])
 app.include_router(inventory_router, prefix="/api/v1/inventory", tags=["Inventario"])
 app.include_router(payments_router, prefix="/api/v1/payments", tags=["Pagos"])
+app.include_router(sales_router, prefix="/api/v1/sales", tags=["Ventas"])
 app.include_router(uploads_router, prefix="/api/v1/uploads", tags=["Archivos"])
 
 

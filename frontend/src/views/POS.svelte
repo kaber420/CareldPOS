@@ -3,7 +3,6 @@
   import { api } from '../stores/api';
   import { notify } from '../stores/auth';
   import Layout from '../components/Layout.svelte';
-  import QRCode from 'qrcode';
   import QrScanner from 'qr-scanner';
   import { fileTypeFromBuffer } from 'file-type';
 
@@ -15,6 +14,8 @@
   import ReceptionModal from '../components/pos/ReceptionModal.svelte';
   import DeviceDetailModal from '../components/pos/DeviceDetailModal.svelte';
   import PhotoGallery from '../components/pos/PhotoGallery.svelte';
+  import POSCart from '../components/pos/POSCart.svelte';
+  import TicketModal from '../components/common/TicketModal.svelte';
 
   const ALLOWED_MIME_TYPES = new Set([
     'image/jpeg',
@@ -29,6 +30,7 @@
   const MAX_VIDEO_SIZE = 30 * 1024 * 1024;
 
   let viewMode = 'grid';
+  let cartItems = [];
 
   // Datos para recepción de dispositivos
   let customers = [];
@@ -38,11 +40,13 @@
     name: '',
     email: '',
     phone: '',
+    whatsapp: '',
+    telegram: '',
     address: ''
   };
 
   let deviceForm = {
-    device_type: '',
+    device_type: 'smartphone',
     brand: '',
     model: '',
     serial_number: '',
@@ -79,10 +83,9 @@
   let galleryPhotos = [];
   let galleryCurrentIndex = 0;
 
-  // QR y Ticket
+  // Ticket
   let showTicket = false;
   let ticketData = null;
-  let qrCodeDataUrl = '';
   let showPhotosModal = false;
   let showScanQR = false;
 
@@ -154,6 +157,11 @@
   }
 
   function openReceptionModal() {
+    selectedCustomer = null;
+    showCustomerForm = false;
+    customerForm = { name: '', email: '', phone: '', whatsapp: '', telegram: '', address: '' };
+    deviceForm = { device_type: 'smartphone', brand: '', model: '', serial_number: '', color: '', storage: '', password_pattern: '', accessories: '', description: '', priority: 'normal' };
+    photos = [];
     showReceptionModal = true;
   }
 
@@ -359,19 +367,143 @@
     showScanQR = false;
   }
 
+  let printClass = '';
   function printTicket(data) {
+    if (typeof data === 'string') {
+      // Si recibimos un string, es un comando de impresión específica
+      printClass = data;
+      setTimeout(() => {
+        window.print();
+        // No reseteamos printClass aquí porque window.print es bloqueante en muchos navegadores,
+        // pero queremos que se limpie DESPUÉS de imprimir.
+        // Un truco común es usar un evento 'afterprint'
+      }, 100);
+      return;
+    }
     ticketData = data;
     showTicket = true;
-
-    setTimeout(() => {
-      window.print();
-      showTicket = false;
-    }, 500);
+    printClass = '';
+  }
+  
+  // Limpiar clase después de imprimir
+  if (typeof window !== 'undefined') {
+    window.onafterprint = () => { printClass = ''; };
   }
 
   function closeTicket() {
     showTicket = false;
     ticketData = null;
+  }
+
+  async function handleCheckout(cartData) {
+    const { items, payment_method, amount_paid, total, change } = cartData;
+    let saleResult = null;
+    let currentAmount = amount_paid;
+
+    try {
+      isProcessing = true;
+      const productItems = items.filter(i => i.type === 'product');
+      const repairItems = items.filter(i => i.type === 'repair');
+
+      // 1. Cobrar productos (Venta)
+      if (productItems.length > 0) {
+        const salePayload = {
+          items: productItems.map(p => ({
+            inventory_item_id: p.id,
+            quantity: p.quantity,
+            unit_price: p.price,
+            subtotal: p.price * p.quantity
+          })),
+          payment_method: payment_method,
+          amount_paid: amount_paid, // We can pass the whole amount_paid for now, the backend compares to total
+          customer_id: selectedCustomer?.id || null
+        };
+        saleResult = await api.createSale(salePayload);
+        // Decrease amount available for next steps if needed, though usually handled as single payment
+      }
+
+      // 2. Cobrar reparaciones
+      for (const repairItem of repairItems) {
+        // En un caso real, llamaríamos a api.createPayment de reparación o api.completeRepair
+        // Aquí simulamos que cambia el estado a entregado
+        const repairs = await api.getRepairs({});
+        const realRepair = repairs.find(r => r.id === repairItem.id);
+        if (realRepair) {
+           await api.updateDevice(realRepair.device_id, { status: 'delivered' });
+           await api.updateRepair(realRepair.id, { status: 'delivered' });
+           
+           // Registrar pago
+           await api.createPayment({
+              repair_id: realRepair.id,
+              amount: repairItem.price,
+              payment_method: payment_method,
+              notes: "Pago en POS"
+           });
+        }
+      }
+
+      notify('Cobro realizado con éxito', 'success');
+      
+      // Imprimir ticket de venta
+      let ticketItems = [];
+      if (saleResult) {
+        ticketItems = [...ticketItems, ...saleResult.items.map(i => ({
+          name: i.name || 'Producto',
+          quantity: i.quantity,
+          sale_price: i.unit_price,
+          subtotal: i.subtotal
+        }))];
+      }
+      for (const r of repairItems) {
+        ticketItems.push({
+          name: r.name,
+          quantity: 1,
+          sale_price: r.price,
+          subtotal: r.price
+        });
+      }
+
+      printTicket({
+        type: 'venta',
+        customer: selectedCustomer || { name: 'Público General' },
+        items: ticketItems,
+        total: total,
+        date: new Date().toISOString(),
+        sale_number: saleResult?.sale_number
+      });
+
+      await loadDevicesForDelivery();
+    } catch (error) {
+      notify('Error al procesar el cobro: ' + error.message, 'danger');
+      throw error;
+    } finally {
+      isProcessing = false;
+    }
+  }
+
+  function handleAddToCart(device) {
+    if (device.status !== 'ready') return;
+    
+    // We need the repair to add to cart
+    api.getRepairs({ device_id: device.id }).then(repairs => {
+      const activeRepair = repairs.find(r => r.status === 'ready' || r.status === 'completed' || r.status === 'in_progress');
+      if (activeRepair) {
+        // Find if already in cart
+        if (!cartItems.find(i => i.id === activeRepair.id && i.type === 'repair')) {
+          cartItems = [...cartItems, {
+            id: activeRepair.id,
+            type: 'repair',
+            name: `Servicio: ${device.brand} ${device.model}`,
+            price: activeRepair.final_cost || activeRepair.estimated_cost || 0,
+            quantity: 1,
+            max_quantity: 1
+          }];
+          notify('Añadido al carrito', 'success');
+        }
+      } else {
+        notify('No se encontró orden de reparación activa', 'warning');
+      }
+    });
   }
 </script>
 
@@ -425,53 +557,76 @@
       </div>
 
       <!-- Lista de dispositivos -->
-      {#if devices.length === 0}
-        <div class="empty-state">
-          <div class="empty-state-icon">📱</div>
-          <p class="empty-state-title">No hay dispositivos</p>
-          <p class="empty-state-description">
-            {deviceSearch || deviceFilters.status || deviceFilters.device_type || deviceFilters.brand
-              ? 'No se encontraron dispositivos con los filtros actuales'
-              : 'Comienza recibiendo un nuevo dispositivo'}
-          </p>
-          {#if !deviceSearch && !deviceFilters.status && !deviceFilters.device_type && !deviceFilters.brand}
-            <button class="btn btn-primary mt-4" on:click={openReceptionModal}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="12" y1="5" x2="12" y2="19"/>
-                <line x1="5" y1="12" x2="19" y2="12"/>
-              </svg>
-              Recibir Dispositivo
-            </button>
+      <div class="pos-layout">
+        <div class="pos-main">
+          {#if devices.length === 0}
+            <div class="empty-state">
+              <div class="empty-state-icon">📱</div>
+              <p class="empty-state-title">No hay dispositivos</p>
+              <p class="empty-state-description">
+                {deviceSearch || deviceFilters.status || deviceFilters.device_type || deviceFilters.brand
+                  ? 'No se encontraron dispositivos con los filtros actuales'
+                  : 'Comienza recibiendo un nuevo dispositivo'}
+              </p>
+              {#if !deviceSearch && !deviceFilters.status && !deviceFilters.device_type && !deviceFilters.brand}
+                <button class="btn btn-primary mt-4" on:click={openReceptionModal}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"/>
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                  </svg>
+                  Recibir Dispositivo
+                </button>
+              {/if}
+            </div>
+          {:else}
+            {#if viewMode === 'grid'}
+              <div class="devices-grid">
+                {#each devices as device}
+                  <div class="device-card-wrapper">
+                    <DeviceCard
+                      {device}
+                      customerName={device.customer?.name || 'Sin cliente'}
+                      onView={onViewDevice}
+                      onEdit={onEditDevice}
+                      onStatusChange={onStatusChange}
+                      onOpenGallery={onOpenGallery}
+                    />
+                    {#if device.status === 'ready'}
+                      <button class="btn btn-success btn-block mt-2" on:click={() => handleAddToCart(device)}>
+                        Cargar a Caja
+                      </button>
+                    {/if}
+                  </div>
+                {/each}
+              </div>
+            {:else}
+              <div class="devices-list">
+                {#each devices as device}
+                  <div class="device-list-item-wrapper" style="display: flex; gap: 1rem; align-items: center;">
+                    <div style="flex: 1;">
+                      <DeviceListItem
+                        {device}
+                        customerName={device.customer?.name || 'Sin cliente'}
+                        onView={onViewDevice}
+                        onEdit={onEditDevice}
+                        onStatusChange={onStatusChange}
+                      />
+                    </div>
+                    {#if device.status === 'ready'}
+                      <button class="btn btn-success" on:click={() => handleAddToCart(device)}>
+                        Cobrar
+                      </button>
+                    {/if}
+                  </div>
+                {/each}
+              </div>
+            {/if}
           {/if}
         </div>
-      {:else}
-        {#if viewMode === 'grid'}
-          <div class="devices-grid">
-            {#each devices as device}
-              <DeviceCard
-                {device}
-                customerName={device.customer?.name || 'Sin cliente'}
-                onView={onViewDevice}
-                onEdit={onEditDevice}
-                onStatusChange={onStatusChange}
-                onOpenGallery={onOpenGallery}
-              />
-            {/each}
-          </div>
-        {:else}
-          <div class="devices-list">
-            {#each devices as device}
-              <DeviceListItem
-                {device}
-                customerName={device.customer?.name || 'Sin cliente'}
-                onView={onViewDevice}
-                onEdit={onEditDevice}
-                onStatusChange={onStatusChange}
-              />
-            {/each}
-          </div>
-        {/if}
-      {/if}
+        <div class="pos-sidebar">
+          <POSCart bind:cartItems onCheckout={handleCheckout} />
+        </div>
+      </div>
     </div>
 
     <!-- Modal de Recepción -->
@@ -563,100 +718,12 @@
       </div>
     {/if}
 
-    <!-- Modal Ticket -->
-    {#if showTicket && ticketData}
-      <div class="modal-overlay" on:click|self={closeTicket}>
-        <div class="modal modal-lg">
-          <div class="modal-header">
-            <h3>Ticket de Operación</h3>
-            <button class="modal-close" on:click={closeTicket}>×</button>
-          </div>
-          <div class="modal-body">
-            <div class="ticket" id="ticket-content">
-              <div class="ticket-header">
-                <h2>CareldPOS</h2>
-                <p>Fecha: {new Date(ticketData.date).toLocaleString()}</p>
-              </div>
-
-              {#if ticketData.type === 'recepcion'}
-                <div class="ticket-section">
-                  <h4>RECEPCIÓN DE DISPOSITIVO</h4>
-                  <p><strong>Cliente:</strong> {ticketData.customer.name}</p>
-                  <p><strong>Teléfono:</strong> {ticketData.customer.phone}</p>
-                </div>
-                <div class="ticket-section">
-                  <h4>Dispositivo</h4>
-                  <p><strong>Tipo:</strong> {ticketData.device.device_type}</p>
-                  <p><strong>Marca:</strong> {ticketData.device.brand}</p>
-                  <p><strong>Modelo:</strong> {ticketData.device.model || 'N/A'}</p>
-                  <p><strong>Color:</strong> {ticketData.device.color || 'N/A'}</p>
-                  <p><strong>Accesorios:</strong> {ticketData.device.accessories || 'Ninguno'}</p>
-                </div>
-                <div class="ticket-section">
-                  <h4>Orden de Reparación #{ticketData.repair.repair_number}</h4>
-                  <p><strong>Estado:</strong> Pendiente</p>
-                  <p><strong>Prioridad:</strong> {ticketData.repair.priority}</p>
-                </div>
-                {#if ticketData.qrCode}
-                  <div class="ticket-qr">
-                    <img src={ticketData.qrCode} alt="Código QR" />
-                    <p class="text-sm text-muted">Escanee para ver el estado de su reparación</p>
-                  </div>
-                {/if}
-              {:else if ticketData.type === 'venta'}
-                <div class="ticket-section">
-                  <h4>VENTA</h4>
-                  <p><strong>Cliente:</strong> {ticketData.customer.name}</p>
-                </div>
-                <div class="ticket-section">
-                  <table class="ticket-table">
-                    <thead>
-                      <tr>
-                        <th>Cant.</th>
-                        <th>Producto</th>
-                        <th>Precio</th>
-                        <th>Subtotal</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {#each ticketData.items as item}
-                        <tr>
-                          <td>{item.quantity}</td>
-                          <td>{item.name}</td>
-                          <td>${item.sale_price.toFixed(2)}</td>
-                          <td>${(item.sale_price * item.quantity).toFixed(2)}</td>
-                        </tr>
-                      {/each}
-                    </tbody>
-                  </table>
-                </div>
-                <div class="ticket-total">
-                  <strong>TOTAL: ${ticketData.total.toFixed(2)}</strong>
-                </div>
-              {/if}
-
-              <div class="ticket-footer">
-                <p>¡Gracias por su compra!</p>
-                <p>Garantía: 30 días</p>
-              </div>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" on:click={closeTicket}>
-              Cerrar
-            </button>
-            <button class="btn btn-primary" onclick="window.print()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="6 9 6 2 18 2 18 9"/>
-                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
-                <rect x="6" y="14" width="12" height="8"/>
-              </svg>
-              Imprimir
-            </button>
-          </div>
-        </div>
-      </div>
-    {/if}
+    <!-- Ticket Modal Unificado -->
+    <TicketModal
+      show={showTicket}
+      {ticketData}
+      onClose={closeTicket}
+    />
 
     <!-- Galería de Fotos -->
     <PhotoGallery
@@ -696,7 +763,25 @@
     font-size: 0.875rem;
   }
 
-  /* Devices View */
+  /* Devices View Layout */
+  .pos-layout {
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-start;
+  }
+
+  .pos-main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .pos-sidebar {
+    width: 350px;
+    position: sticky;
+    top: 1.5rem;
+    height: calc(100vh - 120px);
+  }
+
   .devices-view {
     display: flex;
     flex-direction: column;
@@ -807,83 +892,8 @@
     gap: 1rem;
   }
 
-  /* Ticket */
-  .ticket {
-    font-family: 'Courier New', monospace;
-    padding: 1rem;
-    background: white;
-  }
-
-  .ticket-qr {
-    text-align: center;
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 2px dashed #000;
-  }
-
-  .ticket-qr img {
-    max-width: 200px;
-  }
-
-  .ticket-header {
-    text-align: center;
-    border-bottom: 2px dashed #000;
-    padding-bottom: 1rem;
-    margin-bottom: 1rem;
-  }
-
-  .ticket-section {
-    margin-bottom: 1rem;
-    padding-bottom: 1rem;
-    border-bottom: 1px dashed #000;
-  }
-
-  .ticket-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.8125rem;
-  }
-
-  .ticket-table th,
-  .ticket-table td {
-    padding: 0.5rem;
-    text-align: left;
-    border-bottom: 1px dashed #000;
-  }
-
-  .ticket-total {
-    text-align: right;
-    font-size: 1.125rem;
-    margin-top: 1rem;
-    padding-top: 0.5rem;
-    border-top: 2px dashed #000;
-  }
-
-  .ticket-footer {
-    text-align: center;
-    padding-top: 1rem;
-    font-size: 0.75rem;
-    color: var(--text-light);
-  }
-
-  @media print {
-    body * {
-      visibility: hidden;
-    }
-    #ticket-content,
-    #ticket-content * {
-      visibility: visible;
-    }
-    #ticket-content {
-      position: absolute;
-      left: 0;
-      top: 0;
-      width: 80mm;
-    }
-    .modal-overlay {
-      display: none !important;
-    }
-  }
+  .font-bold { font-weight: bold; }
+  .italic { font-style: italic; }
 
   @media (max-width: 768px) {
     .devices-grid {

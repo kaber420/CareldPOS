@@ -4,6 +4,7 @@ from app.models.device import Device, DeviceType
 from app.models.repair import Repair, RepairStatus, RepairItem
 from app.models.inventory import InventoryItem, Category
 from app.models.payment import Payment, PaymentMethod
+from app.models.sale import Sale, SaleItem
 
 __all__ = [
     "User",
@@ -18,4 +19,6 @@ __all__ = [
     "Category",
     "Payment",
     "PaymentMethod",
+    "Sale",
+    "SaleItem",
 ]

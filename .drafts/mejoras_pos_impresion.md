@@ -1,74 +1,40 @@
-# Plan de Proyecto: POS Integral y Sistema de Impresión de Tickets
+# Plan de Mejoras: Sistema de Impresión y Seguimiento QR
 
-**Objetivo:** Evolucionar la interfaz actual del sistema hacia un Punto de Venta (POS) completo que gestione ventas directas, cobro de reparaciones y un sistema automatizado de generación e impresión de tickets térmicos para talleres.
+Este plan describe la reestructuración del sistema de tickets para lograr impresiones aisladas (sin UI), etiquetas para dispositivos y seguimiento mediante códigos QR vinculados al portal del cliente.
 
----
+## 1. Objetivos Técnicos
+- **Aislamiento de Impresión**: Usar `@media print` para ocultar todo excepto el ticket seleccionado.
+- **Componente Unificado**: Crear `TicketModal.svelte` para centralizar la lógica de diseño y botones.
+- **Botones de Impresión Específica**: Permitir elegir entre "Recibo", "Etiqueta" o "Venta".
+- **QR con Seguimiento**: Integrar códigos QR que apunten a `WWW.CARELD.COM/portal/{token}`.
 
-## 1. Módulo POS Integral (Ventas y Entregas)
+## 2. Componentes a Modificar
 
-El POS dejará de ser únicamente informativo para convertirse en una caja registradora funcional.
+### [NUEVO] TicketModal.svelte (`src/components/common/`)
+- Contendrá los contenedores `#printable-receipt`, `#printable-label` y `#printable-sale`.
+- Lógica de `window.print()` con clases CSS inyectadas (`print-receipt-only`, etc.).
+- Generación dinámica de QR usando el `portal_token` de la reparación.
 
-### Funcionalidades Clave
-1. **Venta de Accesorios y Refacciones:**
-   - Interfaz con un "Carrito de Compras" en el panel derecho.
-   - Panel izquierdo con catálogo de productos visuales (accesorios, cargadores, fundas) y buscador rápido.
-   - Posibilidad de vender refacciones a otros técnicos con "Precio de Técnico" (aplicando descuentos).
-2. **Cobro y Entrega de Dispositivos:**
-   - Poder buscar una Orden de Reparación que ya está "Lista para entregar".
-   - Al seleccionarla, el saldo pendiente se agrega automáticamente al carrito del POS.
-   - Al procesar el pago, el estado del dispositivo cambia a "Entregado".
-3. **Gestión de Pagos:**
-   - Selección de métodos de pago (Efectivo, Tarjeta, Transferencia).
-   - Cálculo de cambio exacto.
+### [MODIFICAR] POS.svelte
+- Eliminar la implementación local del ticket.
+- Importar y usar `TicketModal`.
+- Asegurar que al finalizar una venta o recepción se active el modal con la data correcta.
 
-### Cambios Técnicos Necesarios
-- **Backend:** Crear modelos de base de datos para `Sale` (Venta) y `SaleItem` (Artículos de venta), ya que actualmente el sistema parece girar únicamente en torno a `Repair`.
-- **Frontend:** Rediseñar `POS.svelte` para tener un diseño clásico de caja registradora.
+### [MODIFICAR] Repairs.svelte
+- Añadir columna de acciones con el icono 🖨️.
+- Función `printRepairTicket(repair)` para abrir el modal unificado.
 
----
+## 3. Estrategia CSS (Aislamiento)
+En `TicketModal.svelte` (o global):
+```css
+@media print {
+  body * { visibility: hidden !important; }
+  #ticket-content, #ticket-content * { visibility: visible !important; }
+  /* ... clases para ocultar partes específicas según la selección ... */
+}
+```
 
-## 2. Sistema de Impresión de Tickets (Órdenes y Ventas)
-
-Implementar un diseño orientado a **Impresoras Térmicas (58mm o 80mm)**, utilizando CSS de impresión (`@media print`) para evitar que el usuario deba instalar software pesado.
-
-### A. Tickets de Venta / Recibos
-- Se imprimen al finalizar una venta en el POS o al cobrar una reparación.
-- **Contenido:** Logo del negocio, fecha, productos/servicios, total, método de pago y mensaje de agradecimiento.
-
-### B. Tickets de Orden de Trabajo (Ingreso de Dispositivo)
-Al momento de registrar un nuevo dispositivo para reparación, el sistema lanzará automáticamente la impresión de **dos tickets distintos**:
-
-1. **Ticket de Control (Para pegar en el dispositivo):**
-   - Tamaño optimizado y compacto.
-   - Contiene: Número de Orden, Nombre corto del cliente, Modelo del dispositivo, Fallo principal.
-   - *Opcional:* Un código de barras o QR para escanearlo posteriormente en el POS y encontrar la orden rápidamente.
-
-2. **Ticket del Cliente (Comprobante):**
-   - Contiene: Datos completos del taller, información del dispositivo ingresado, fallos reportados, fecha estimada y cotización (si aplica).
-   - **Código QR de Seguimiento:** Un QR grande que, al ser escaneado por el cliente con su celular, lo lleve al "Portal del Cliente" para ver el estado de su reparación en tiempo real.
-   - Términos y condiciones del servicio (Letras pequeñas, ej: "Pasados 30 días no nos hacemos responsables...").
-
-### Cambios Técnicos Necesarios
-- **Frontend:**
-  - Crear un componente invisible en pantalla pero visible para impresión (ej: `PrintLayout.svelte`).
-  - Utilizar estilos CSS rigurosos para impresoras térmicas (ancho fijo en milímetros, fuentes sin serifas, remover márgenes del navegador).
-  - Al completar una acción (Nueva Orden o Nueva Venta), llamar a `window.print()` inyectando los datos temporalmente.
-- **Generación de QR:** Integrar una librería genérica de JavaScript para generar el QR en el frontend justo antes de imprimir, evitando peticiones pesadas al backend.
-
----
-
-## 3. Fases de Desarrollo Sugeridas
-
-1. **Fase 1: Preparación del Backend para Ventas:** 
-   - Crear tablas `Sale`, `SaleItem`. 
-   - Definir endpoints de ventas y enlazar el stock (reducir inventario al vender).
-2. **Fase 2: Interfaz POS:** 
-   - Reestructurar el carrito de la compra. 
-   - Integrar la búsqueda de accesorios y órdenes.
-3. **Fase 3: Layouts de Impresión:** 
-   - Maquetación HTML/CSS de los 3 formatos (Ticket de Venta, Etiqueta Técnica, Comprobante Cliente).
-4. **Fase 4: Integración del Flujo Automático:** 
-   - Unir la creación de reparaciones/ventas con el disparador automático de `window.print()`.
-
----
-*Nota: Este documento es un borrador (draft). Puedes solicitarme que comencemos a ejecutar cualquiera de estas fases cuando lo desees.*
+## 4. Plan de Verificación
+1. **Flujo POS**: Realizar venta y probar botones "Solo Venta" y "Imprimir Todo".
+2. **Flujo Reparaciones**: Imprimir etiqueta de equipo y verificar que el tamaño (80mm) sea correcto.
+3. **QR**: Escanear con móvil y verificar que el link generado sea válido.

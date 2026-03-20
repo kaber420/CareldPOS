@@ -6,6 +6,7 @@ from app.api.repairs import router as repairs_router
 from app.api.inventory import router as inventory_router
 from app.api.payments import router as payments_router
 from app.api.uploads import router as uploads_router
+from app.api.sales import router as sales_router
 
 __all__ = [
     "auth_router",
@@ -16,4 +17,5 @@ __all__ = [
     "inventory_router",
     "payments_router",
     "uploads_router",
+    "sales_router",
 ]
