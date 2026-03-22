@@ -175,7 +175,7 @@
                 <p class="text-slate-400 font-medium">No se encontraron equipos</p>
               </div>
             {:else if viewMode === 'grid'}
-              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              <div class="device-grid-auto">
                 {#each filteredDevices as device (device.id)}
                   <div class="space-y-3">
                     <DeviceCard 
@@ -221,3 +221,18 @@
     </div>
   </div>
 </Layout>
+
+<style>
+  .device-grid-auto {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.5rem;
+  }
+  
+  /* Ajuste para pantallas muy pequeñas */
+  @media (max-width: 480px) {
+    .device-grid-auto {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
