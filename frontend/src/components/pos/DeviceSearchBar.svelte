@@ -1,6 +1,6 @@
 <script>
   export let value = '';
-  export let placeholder = 'Buscar por dispositivo, cliente, teléfono...';
+  export let placeholder = 'Buscar reparaciones, accesorios, refacciones...';
   export let filters = {
     status: '',
     device_type: '',

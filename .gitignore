@@ -19,7 +19,6 @@ env/
 ENV/
 bin/
 include/
-lib/
 share/
 pyvenv.cfg
 
@@ -81,3 +80,4 @@ logs/
 Dockerfile
 docker-compose.yml
 .drafts/*
+scripts/migrate_sale_items.py

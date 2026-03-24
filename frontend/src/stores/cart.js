@@ -5,26 +5,50 @@ function createCart() {
 
   return {
     subscribe,
-    addItem: (product) => update(items => {
-      const existing = items.find(i => i.id === product.id);
-      const stock = product.stock_quantity || 0;
+    addItem: (item) => update(items => {
+      // Unique key based on type + id
+      const itemKey = `${item.type || 'product'}-${item.id}`;
+      const existing = items.find(i => `${i.type || 'product'}-${i.id}` === itemKey);
       
+      // If it's a repair, it's unique and only quantity 1
+      if (item.type === 'repair') {
+        if (existing) return items;
+        return [...items, { ...item, quantity: 1, unit_price: item.price }];
+      }
+
+      // If it's a product, check stock
+      const stock = item.stock_quantity || item.max_quantity || 0;
       if (existing) {
         if (existing.quantity >= stock) return items;
-        return items.map(i => i.id === product.id 
+        return items.map(i => `${i.type || 'product'}-${i.id}` === itemKey 
           ? { ...i, quantity: i.quantity + 1 } 
           : i
         );
       }
+      
       if (stock <= 0) return items;
-      return [...items, { ...product, quantity: 1 }];
+      return [...items, { ...item, quantity: 1, unit_price: item.price || item.unit_price }];
     }),
-    removeItem: (productId) => update(items => items.filter(i => i.id !== productId)),
-    updateQuantity: (productId, quantity, stockQuantity) => update(items => {
-      if (quantity <= 0) return items.filter(i => i.id !== productId);
-      const stock = stockQuantity || items.find(i => i.id === productId)?.stock_quantity || 0;
+    removeItem: (id, type = 'product') => update(items => 
+      items.filter(i => !(`${i.type || 'product'}-${i.id}` === `${type}-${id}`))
+    ),
+    updateQuantity: (id, type, quantity) => update(items => {
+      const itemKey = `${type || 'product'}-${id}`;
+      const item = items.find(i => `${i.type || 'product'}-${i.id}` === itemKey);
+      if (!item) return items;
+      
+      if (quantity <= 0) return items.filter(i => `${i.type || 'product'}-${i.id}` !== itemKey);
+      
+      // Repairs cannot change quantity
+      if (item.type === 'repair') return items;
+
+      const stock = item.stock_quantity || item.max_quantity || 0;
       const finalQuantity = Math.min(quantity, stock);
-      return items.map(i => i.id === productId ? { ...i, quantity: finalQuantity } : i);
+      
+      return items.map(i => `${i.type || 'product'}-${i.id}` === itemKey 
+        ? { ...i, quantity: finalQuantity } 
+        : i
+      );
     }),
     clear: () => set([]),
   };

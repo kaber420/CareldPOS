@@ -7,12 +7,16 @@ from app.schemas.payment import PaymentResponse
 
 # Items
 class SaleItemCreate(SaleItemBase):
-    inventory_item_id: int
+    inventory_item_id: Optional[int] = None
+    repair_id: Optional[int] = None
+    service_name: Optional[str] = None
 
 class SaleItemResponse(SaleItemBase):
     id: int
     sale_id: int
-    inventory_item_id: int
+    inventory_item_id: Optional[int] = None
+    repair_id: Optional[int] = None
+    service_name: Optional[str] = None
     created_at: datetime
     
     # Podría incluir detalles del item

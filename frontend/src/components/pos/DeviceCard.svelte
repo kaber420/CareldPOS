@@ -5,6 +5,14 @@
   export let onEdit = () => {};
   export let onStatusChange = () => {};
   export let onOpenGallery = () => {};
+  
+  // New flexible props for Unified POS
+  export let showEdit = true;
+  export let showStatus = true;
+  export let showCancel = false;
+  export let showAddToCart = false;
+  export let onCancel = () => {};
+  export let onAddToCart = () => {};
 
   const statusLabels = {
     registered: 'Registrado',
@@ -103,7 +111,7 @@
       {/if}
     </div>
 
-    <div class="card-actions grid grid-cols-3 border-t border-gray-50 dark-border-gray-700 pt-4 -mx-1">
+    <div class="card-actions grid grid-cols-2 lg:grid-cols-3 border-t border-gray-50 dark-border-gray-700 pt-4 -mx-1">
       <button
         class="btn btn-ghost btn-sm flex flex-col h-auto py-2 gap-1 hover:bg-indigo-50 dark:hover-bg-indigo-900-20 text-gray-400 hover:text-indigo-600 transition-all rounded-xl"
         on:click|stopPropagation={() => onView(device)}
@@ -114,28 +122,57 @@
         </svg>
         <span class="text-[9px] font-black uppercase">Detalle</span>
       </button>
+
+      {#if showEdit}
+        <button
+          class="btn btn-ghost btn-sm flex flex-col h-auto py-2 gap-1 hover:bg-blue-50 dark:hover-bg-blue-900-20 text-gray-400 hover:text-blue-600 transition-all rounded-xl"
+          on:click|stopPropagation={() => onEdit(device)}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="w-4 h-4">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+          <span class="text-[9px] font-black uppercase">Editar</span>
+        </button>
+      {/if}
       
-      <button
-        class="btn btn-ghost btn-sm flex flex-col h-auto py-2 gap-1 hover:bg-blue-50 dark:hover-bg-blue-900-20 text-gray-400 hover:text-blue-600 transition-all rounded-xl"
-        on:click|stopPropagation={() => onEdit(device)}
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="w-4 h-4">
-          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-        </svg>
-        <span class="text-[9px] font-black uppercase">Editar</span>
-      </button>
-      
-      <button
-        class="btn btn-ghost btn-sm flex flex-col h-auto py-2 gap-1 hover:bg-amber-50 dark:hover-bg-amber-900-20 text-gray-400 hover:text-amber-600 transition-all rounded-xl"
-        on:click|stopPropagation={() => onStatusChange(device)}
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="w-4 h-4">
-          <polyline points="23 4 23 10 17 10"/>
-          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-        </svg>
-        <span class="text-[9px] font-black uppercase">Estado</span>
-      </button>
+      {#if showStatus}
+        <button
+          class="btn btn-ghost btn-sm flex flex-col h-auto py-2 gap-1 hover:bg-amber-50 dark:hover-bg-amber-900-20 text-gray-400 hover:text-amber-600 transition-all rounded-xl"
+          on:click|stopPropagation={() => onStatusChange(device)}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="w-4 h-4">
+            <polyline points="23 4 23 10 17 10"/>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+          </svg>
+          <span class="text-[9px] font-black uppercase">Estado</span>
+        </button>
+      {/if}
+
+      {#if showCancel}
+        <button
+          class="btn btn-ghost btn-sm flex flex-col h-auto py-2 gap-1 hover:bg-red-50 dark:hover-bg-red-900-20 text-gray-400 hover:text-red-600 transition-all rounded-xl"
+          on:click|stopPropagation={() => onCancel(device)}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="w-4 h-4">
+            <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+          </svg>
+          <span class="text-[9px] font-black uppercase">Cancelar</span>
+        </button>
+      {/if}
+
+      {#if showAddToCart}
+        <button
+          class="btn btn-ghost btn-sm flex flex-col h-auto py-2 gap-1 hover:bg-green-50 dark:hover-bg-green-900-20 text-gray-400 hover:text-green-600 transition-all rounded-xl col-span-full border-t border-gray-50 mt-2 pt-3"
+          on:click|stopPropagation={() => onAddToCart(device)}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="w-5 h-5">
+            <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+          </svg>
+          <span class="text-[11px] font-black uppercase">Cargar a Caja</span>
+        </button>
+      {/if}
     </div>
   </div>
 </div>

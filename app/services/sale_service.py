@@ -4,6 +4,7 @@ from sqlmodel import Session, select
 from app.models.sale import Sale, SaleItem
 from app.models.inventory import InventoryItem, MovementType
 from app.models.payment import Payment, PaymentMethod, PaymentStatus
+from app.models.repair import Repair, RepairStatus
 from app.services.inventory_service import InventoryService
 from fastapi import HTTPException, status
 
@@ -30,23 +31,41 @@ class SaleService:
         sale_items = []
 
         for item_data in items_data:
-            inventory_item_id = item_data["inventory_item_id"]
+            inventory_item_id = item_data.get("inventory_item_id")
+            repair_id = item_data.get("repair_id")
+            service_name = item_data.get("service_name")
             quantity = item_data["quantity"]
             
-            # Verificar stock
-            inventory_item = self.inventory_service.get_item_by_id(inventory_item_id)
-            if not inventory_item:
-                raise ValueError(f"El producto con ID {inventory_item_id} no existe")
-                
-            if inventory_item.stock_quantity < quantity:
-                raise ValueError(f"Stock insuficiente para {inventory_item.name}. Disponible: {inventory_item.stock_quantity}")
+            unit_price = item_data.get("unit_price", 0.0)
             
-            unit_price = item_data.get("unit_price", inventory_item.unit_price)
+            # Verificar stock solo si es item de inventario
+            if inventory_item_id:
+                inventory_item = self.inventory_service.get_item_by_id(inventory_item_id)
+                if not inventory_item:
+                    raise ValueError(f"El producto con ID {inventory_item_id} no existe")
+                    
+                if inventory_item.stock_quantity < quantity:
+                    raise ValueError(f"Stock insuficiente para {inventory_item.name}. Disponible: {inventory_item.stock_quantity}")
+                
+                if unit_price == 0.0:
+                    unit_price = inventory_item.unit_price
+            elif repair_id:
+                repair = self.session.get(Repair, repair_id)
+                if not repair:
+                    raise ValueError(f"La reparación con ID {repair_id} no existe")
+            elif service_name:
+                if unit_price == 0.0:
+                    raise ValueError("El precio unitario es obligatorio para servicios genéricos")
+            else:
+                raise ValueError("El item debe tener inventory_item_id, repair_id o service_name")
+            
             subtotal = unit_price * quantity
             total += subtotal
             
             sale_items.append({
                 "inventory_item_id": inventory_item_id,
+                "repair_id": repair_id,
+                "service_name": service_name,
                 "quantity": quantity,
                 "unit_price": unit_price,
                 "subtotal": subtotal,
@@ -71,23 +90,33 @@ class SaleService:
 
         # Crear items y reducir stock
         for item_data in sale_items:
-            # Reducir stock usando inventory_service
-            self.inventory_service.adjust_stock(
-                item_id=item_data["inventory_item_id"],
-                quantity=-item_data["quantity"],
-                reason=f"Venta {sale_number}",
-                movement_type=MovementType.WITHDRAWAL,
-                user_id=user_id
-            )
+            # Reducir stock usando inventory_service solo si es inventario
+            if item_data.get("inventory_item_id"):
+                self.inventory_service.adjust_stock(
+                    item_id=item_data["inventory_item_id"],
+                    quantity=-item_data["quantity"],
+                    reason=f"Venta {sale_number}",
+                    movement_type=MovementType.WITHDRAWAL,
+                    user_id=user_id
+                )
+            
+            if item_data.get("repair_id"):
+                repair = self.session.get(Repair, item_data["repair_id"])
+                if repair:
+                    repair.status = RepairStatus.DELIVERED
+                    repair.delivered_at = datetime.utcnow()
+                    self.session.add(repair)
             
             # Crear SaleItem
             sale_item = SaleItem(
                 sale_id=sale.id,
-                inventory_item_id=item_data["inventory_item_id"],
+                inventory_item_id=item_data.get("inventory_item_id"),
+                repair_id=item_data.get("repair_id"),
+                service_name=item_data.get("service_name"),
                 quantity=item_data["quantity"],
                 unit_price=item_data["unit_price"],
                 subtotal=item_data["subtotal"],
-                notes=item_data["notes"]
+                notes=item_data.get("notes")
             )
             self.session.add(sale_item)
 

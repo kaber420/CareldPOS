@@ -36,8 +36,8 @@ class Sale(SaleBase, table=True):
 class SaleItemBase(SQLModel):
     """Base fields for Sale Item"""
     quantity: int = Field(default=1, ge=1)
-    unit_price: float = Field(ge=0)
-    subtotal: float = Field(ge=0)
+    unit_price: float = Field(default=0.0, ge=0)
+    subtotal: float = Field(default=0.0, ge=0)
     notes: Optional[str] = Field(default=None)
 
 class SaleItem(SaleItemBase, table=True):
@@ -46,7 +46,9 @@ class SaleItem(SaleItemBase, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     sale_id: int = Field(foreign_key="sales.id", index=True)
-    inventory_item_id: int = Field(foreign_key="inventory_items.id")
+    inventory_item_id: Optional[int] = Field(default=None, foreign_key="inventory_items.id")
+    repair_id: Optional[int] = Field(default=None, foreign_key="repairs.id")
+    service_name: Optional[str] = Field(default=None)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     sale: Optional["Sale"] = Relationship(back_populates="items")
