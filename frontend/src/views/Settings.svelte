@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { settings, fetchAllSettings, updateSetting } from '../stores/settings';
   import { notify } from '../stores/auth';
+  import Layout from '../components/Layout.svelte';
 
   let loading = true;
   let saving = false;
@@ -38,6 +39,7 @@
   }
 </script>
 
+<Layout>
 <div class="settings-container">
   <header class="page-header">
     <div>
@@ -297,3 +299,4 @@
     }
   }
 </style>
+</Layout>

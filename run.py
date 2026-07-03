@@ -2,14 +2,13 @@ import uvicorn
 import os
 import sys
 import argparse
-from app.config import settings
 
 def main():
     """
     Punto de entrada principal para ejecutar la aplicación.
     Soporta configuraciones mediante flags y carga de variables de entorno.
     """
-    parser = argparse.ArgumentParser(description=f"Launcher de {settings.APP_NAME}")
+    parser = argparse.ArgumentParser(description="Launcher de CareldPOS")
     parser.add_argument(
         "--setup", "-s", 
         action="store_true", 
@@ -19,10 +18,19 @@ def main():
     args = parser.parse_args()
 
     if args.setup:
-        # Importación diferida para no cargar todo si no es necesario
         from app.setup_cli import run_setup
         run_setup()
         return
+
+    if not os.path.exists(".env"):
+        print("\n" + "="*40)
+        print("❌ Error: Falta archivo .env")
+        print("="*40)
+        print("\nPara configurar la aplicación ejecutá:")
+        print("  python3 run.py --setup\n")
+        sys.exit(1)
+
+    from app.config import settings
 
     print("\n" + "="*40)
     print(f"🚀 Iniciando {settings.APP_NAME} v{settings.APP_VERSION}")

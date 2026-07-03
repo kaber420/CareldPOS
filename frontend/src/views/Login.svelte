@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { navigate } from 'svelte-routing';
-  import { user, isAuthenticated, notify } from '../stores/auth';
+  import { user, isAuthenticated, setAuth, notify } from '../stores/auth';
   import { api } from '../stores/api';
 
   let isLoading = true;
@@ -50,8 +50,7 @@
       const data = await api.login(username, password);
       localStorage.setItem('token', data.access_token);
       const userData = await api.getMe();
-      user.set(userData);
-      isAuthenticated.set(true);
+      setAuth(userData, data.access_token);
       notify(`Bienvenido, ${userData.full_name}!`, 'success');
       
       if (userData.role === 'partner') {

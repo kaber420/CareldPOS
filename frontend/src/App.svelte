@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { Router, Route } from 'svelte-routing';
+  import { Router, Route, navigate } from 'svelte-routing';
   import { isAuthenticated, user, clearAuth, notify } from './stores/auth';
   import { api } from './stores/api';
 
